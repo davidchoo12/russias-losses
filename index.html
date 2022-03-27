@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<head>
+  <title>Russia's losses</title>
+  <link rel="favicon" href="favicon.ico">
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/leeoniya/uPlot/dist/uPlot.min.css">
+  <script src="https://cdn.jsdelivr.net/gh/leeoniya/uPlot/dist/uPlot.iife.min.js"></script>
+  <style>
+    body {
+      font-family: Arial;
+    }
+    #overlay {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 0.5rem;
+      margin: 0.75rem;
+      color: #fff;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .title {
+      width: 100%;
+      text-align: center;
+    }
+    .stat {
+      display: inline-block;
+      margin: 0 1em;
+    }
+    .stat-number {
+      font-size: 1.5em;
+    }
+    .delta {
+      font-size: 0.9em;
+      font-weight: bold;
+      vertical-align: top;
+      color: green;
+    }
+    .delta::before {
+      content: "▲";
+    }
+    .negative {
+      color: red;
+    }
+    .negative::before {
+      content: "▼";
+    }
+    .stat-unit {
+      font-size: 1.5em;
+    }
+    .uplot {
+      display: inline-block;
+    }
+    .tooltip {
+      color: white;
+    }
+    #sources-links {
+      overflow-wrap: break-word;
+    }
+    #sources-links span {
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <h1 class="title">Russia's losses</h1>
+  <p>Cumulative charts of Russia's daily military losses in the ongoing war.</p>
+  <h2>As of <span id="latest-date"></span>, Russia has lost:</h2>
+  <div id="stats">
+    <template id="stat-template"><div class="stat"><span class="stat-number">{number}</span><span class="delta">{delta}</span><span class="stat-unit">{unit}</span></div></template>
+    <!-- <div class="stat"><span class="stat-number">100</span><span class="delta">20</span><span class="stat-unit">troops</span></div>
+    <div class="stat"><span class="stat-number">100</span><span class="delta">20</span><span class="stat-unit">armored personnel carriers</span></div> -->
+  </div>
+  <small>(Deltas are relative to the previous datapoints)</small>
+  <div id="charts"></div>
+  <p>Sources:
+    <br>
+    <span id="sources-links"></span>
+  </p>
+  <p>Notes:
+    <ol>
+      <li>All data is sourced from <a href="https://twitter.com/KyivIndependent/">@KyivIndependent Twitter</a> daily reports. Their source is from the General Staff of the Armed Forces of Ukraine. I chose not to source the data directly from the primary source is because the OCR does not work with their images.</li>
+      <li>Boats is missing from the image on 2022-02-28.</li>
+      <li>Special equipment was shown as only 2 from the image on 2022-03-26 (decreased from 18) but I corrected it to 19 according to the <a href="https://t.co/z6plV7HBNa">source from General Staff of the Armed Forces of Ukraine.</a></li>
+    </ol>
+  </p>
+  <script>
+    var $ = document.querySelector.bind(document)
+    function getSize() {
+      const breakpoints = [640, 1280, 1536]
+      let i = 0
+      for (const b of breakpoints) {
+        if (b > window.innerWidth) {
+          break
+        }
+        i++
+      }
+      const length = (window.innerWidth - 16) / (i+1) // 16 px for body horizontal margins
+      return {
+        width: length,
+        height: length/2,
+      }
+    }
+    function tooltipsPlugin(opts) {
+      function init(u, opts, data) {
+        let over = u.over
+
+        let ttc = u.cursortt = document.createElement("div")
+        ttc.className = "tooltip"
+        ttc.textContent = "(x,y)"
+        ttc.style.pointerEvents = "none"
+        ttc.style.position = "absolute"
+        ttc.style.background = "rgba(0,0,0,0.9)"
+        over.appendChild(ttc)
+
+        function hideTips() {
+          ttc.style.display = "none"
+        }
+
+        function showTips() {
+          ttc.style.display = null
+        }
+
+        over.addEventListener("mouseleave", () => {
+          if (!u.cursor._lock) {
+          //  u.setCursor({left: -10, top: -10})
+            hideTips()
+          }
+        })
+
+        over.addEventListener("mouseenter", (e, a, b,c ,d) => {
+          showTips()
+        })
+
+        hideTips()
+      }
+
+      function setCursor(u) {
+        // console.log(u)
+        let {left, top, idx} = u.cursor
+        const x = u.data[0][idx]
+        const y = u.data[1][idx]
+
+        cursorX = u.over.getBoundingClientRect().x + left
+        cursorY = u.over.getBoundingClientRect().y + top
+        // if (cursorX + u.cursortt.offsetWidth > document.documentElement.clientWidth - 100) {
+        if (left > u.over.getBoundingClientRect().width / 2) {
+          left -= u.cursortt.offsetWidth
+        }
+        // if (cursorY > document.documentElement.clientHeight / 2) {
+        if (top > u.over.getBoundingClientRect().height / 2) {
+          top -= u.cursortt.offsetHeight
+        }
+        u.cursortt.style.left = left + "px"
+        u.cursortt.style.top = top + "px"
+        if (x) {
+          u.cursortt.textContent = new Date(x*1000).toISOString().split('T')[0] + ", " + y
+        }
+      }
+
+      return {
+        hooks: {
+          init,
+          setCursor,
+        },
+      }
+    }
+    function makeChart(title, xs, ys) {
+      const opts = {
+        title: title,
+        ...getSize(),
+        cursor: {
+          points: {
+            size: 2,
+          },
+          sync: {
+            key: 1,
+          },
+        },
+        plugins: [
+          tooltipsPlugin(),
+        ],
+        tzDate: ts => uPlot.tzDate(new Date(ts * 1e3), 'Etc/UTC'),
+        series: [
+          {},
+          {
+            label: title,
+            stroke: 'blue',
+            // values: (self, si, i) => { let v = {}; v[i] = ys[i]; return v }
+          }
+        ],
+        scales: {
+          'x': {
+            range: [new Date('2022-02-25').getTime()/1000, xs[xs.length-1]+86400]
+          }
+        },
+        legend: {
+          show: false,
+        },
+        axes: [
+          {
+            // [0]:   minimum num secs in found axis split (tick incr)
+            // [1]:   default tick format
+            // [2-7]: rollover tick formats
+            // [8]:   mode: 0: replace [1] -> [2-7], 1: concat [1] + [2-7]
+            values: [
+            // tick incr          default           year                             month    day                        hour     min                sec       mode
+              [3600 * 24 * 365,   "{YYYY}",         null,                            null,    null,                      null,    null,              null,        1],
+              [3600 * 24 * 28,    "{MMM}",          "\n{YYYY}",                      null,    null,                      null,    null,              null,        1],
+              [3600 * 24,         "{MM}/{DD}",        "\n{YYYY}",                      null,    null,                      null,    null,              null,        1],
+              [3600,              "{h}{aa}",        "\n{MM}/{DD}/{YY}",                null,    "\n{MM}/{DD}",               null,    null,              null,        1],
+              [60,                "{h}:{mm}{aa}",   "\n{MM}/{DD}/{YY}",                null,    "\n{MM}/{DD}",               null,    null,              null,        1],
+              [1,                 ":{ss}",          "\n{MM}/{DD}/{YY} {h}:{mm}{aa}",   null,    "\n{MM}/{DD} {h}:{mm}{aa}",  null,    "\n{h}:{mm}{aa}",  null,        1],
+              [0.001,             ":{ss}.{fff}",    "\n{MM}/{DD}/{YY} {h}:{mm}{aa}",   null,    "\n{MM}/{DD} {h}:{mm}{aa}",  null,    "\n{h}:{mm}{aa}",  null,        1],
+            ],
+          },
+          {
+            size: 60,
+          }
+        ],
+      }
+      new uPlot(opts, [xs, ys], $('#charts'))
+    }
+
+    function makeCharts(stats) {
+      for (const [name, points] of Object.entries(stats)) {
+        let xs = []
+        let ys = []
+        for (const [x, y] of points) {
+          let d = new Date(x)
+          xs.push(d.getTime()/1000)
+          ys.push(y)
+        }
+        makeChart(name, xs, ys)
+      }
+    }
+
+    function addNewElem(parentElem, childHtml) {
+      // src https://stackoverflow.com/a/494348/4858751
+      let tempElem = document.createElement('div')
+      tempElem.innerHTML = childHtml
+      parentElem.appendChild(tempElem.firstChild)
+      tempElem.remove()
+    }
+
+    function showLatestStats(stats) {
+      // get latest date of all stats series
+      const latestDate = Object.values(stats).reduce((a, e) => { x = e[e.length-1][0]; return a > x ? a : x}, '')
+      $('#latest-date').innerText = latestDate
+      for (const [name, points] of Object.entries(stats)) {
+        if (points[points.length-1][0] != latestDate) {
+          continue
+        }
+        const number = points[points.length-1][1]
+        const delta = points.length == 1 ? points[0][1] : points[points.length-1][1] - points[points.length-2][1]
+        addNewElem($('#stats'), `<div class="stat"><span class="stat-number">${number}</span><span class="delta${delta < 0 ? ' negative' : ''}">${delta}</span><span class="stat-unit">${name}</span></div>`)
+      }
+    }
+
+    function showSourcesLinks(dateSource) {
+      for (const [date, url] of Object.entries(dateSource)) {
+        addNewElem($('#sources-links'), `<span><a href=${url}>${date}</a>&nbsp;</span>`)
+      }
+    }
+
+    function render(data) {
+      const stats = data.stats
+      const dateSource = data.date_source
+      makeCharts(stats)
+      showLatestStats(stats)
+      showSourcesLinks(dateSource)
+    }
+    fetch('data.json').then(r => r.json()).then(data => render(data))
+  </script>
+</body>
+</html>

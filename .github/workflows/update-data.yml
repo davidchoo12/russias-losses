@@ -1,0 +1,35 @@
+name: 'Update Data'
+
+on: workflow_dispatch
+  # schedule:
+  #   - cron: '*/20 * * * *'
+  # workflow_dispatch:
+  #   inputs:
+  #     start_index:
+  #       description: Index to start scraping from (index is line no of post-ids.csv). Will continue scraping from previous merged artifact if left empty.
+  #       default: ''
+
+jobs:
+  has_new_posts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: '3.x'
+      - name: Install dependencies
+        run: |
+          sudo apt install -y tesseract-ocr libtesseract-dev
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+      - name: Update data to latest
+        env:
+          TWITTER_TOKEN: ${{ secrets.TwitterToken }}
+        run: |
+          python updater.py
+      - name: Set current date as env variable
+        id: date
+        run: echo ::set-output name=today::$(date +'%Y-%m-%dT%H:%M:%SZ')
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: Update data ${{ steps.date.outputs.today }}
