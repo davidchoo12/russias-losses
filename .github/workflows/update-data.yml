@@ -1,16 +1,12 @@
 name: 'Update Data'
 
-on: workflow_dispatch
-  # schedule:
-  #   - cron: '*/20 * * * *'
-  # workflow_dispatch:
-  #   inputs:
-  #     start_index:
-  #       description: Index to start scraping from (index is line no of post-ids.csv). Will continue scraping from previous merged artifact if left empty.
-  #       default: ''
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
 
 jobs:
-  has_new_posts:
+  update_data:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -24,7 +20,7 @@ jobs:
           pip install -r requirements.txt
       - name: Update data to latest
         env:
-          TWITTER_TOKEN: ${{ secrets.TwitterToken }}
+          TWITTER_TOKEN: ${{ secrets.TWITTER_TOKEN }}
         run: |
           python updater.py
       - name: Set current date as env variable
