@@ -3,6 +3,21 @@
   <title>Russia's losses</title>
   <link rel="favicon" href="favicon.ico">
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- SEO meta tags -->
+  <meta name="title" content="Latest Russia's Military Losses">
+  <meta name="description" content="Visualization of latest Russia's military losses throughout the ongoing war in Ukraine.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://russiaslosses.netlify.app/">
+  <meta property="og:title" content="Latest Russia's Military Losses">
+  <meta property="og:description" content="Visualization of latest Russia's military losses throughout the ongoing war in Ukraine.">
+  <meta property="og:image" content="https://russiaslosses.netlify.app/seo-banner.png">
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://russiaslosses.netlify.app/">
+  <meta property="twitter:title" content="Latest Russia's Military Losses">
+  <meta property="twitter:description" content="Visualization of latest Russia's military losses throughout the ongoing war in Ukraine.">
+  <meta property="twitter:image" content="https://russiaslosses.netlify.app/seo-banner.png">
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/leeoniya/uPlot/dist/uPlot.min.css">
   <script src="https://cdn.jsdelivr.net/gh/leeoniya/uPlot/dist/uPlot.iife.min.js"></script>
   <style>
@@ -63,13 +78,8 @@
 </head>
 <body>
   <h1 class="title">Russia's losses</h1>
-  <p>Cumulative charts of Russia's daily military losses in the ongoing war.</p>
   <h2>As of <span id="latest-date"></span>, Russia has lost:</h2>
-  <div id="stats">
-    <template id="stat-template"><div class="stat"><span class="stat-number">{number}</span><span class="delta">{delta}</span><span class="stat-unit">{unit}</span></div></template>
-    <!-- <div class="stat"><span class="stat-number">100</span><span class="delta">20</span><span class="stat-unit">troops</span></div>
-    <div class="stat"><span class="stat-number">100</span><span class="delta">20</span><span class="stat-unit">armored personnel carriers</span></div> -->
-  </div>
+  <div id="stats"></div>
   <small>(Deltas are relative to the previous datapoints)</small>
   <div id="charts"></div>
   <p>Sources:
@@ -122,7 +132,6 @@
 
         over.addEventListener("mouseleave", () => {
           if (!u.cursor._lock) {
-          //  u.setCursor({left: -10, top: -10})
             hideTips()
           }
         })

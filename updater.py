@@ -6,7 +6,7 @@ import pytesseract
 import numpy as np
 from urllib.request import urlopen
 import re
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 import os
 import difflib
 
@@ -14,8 +14,8 @@ bearer_token = os.environ.get('TWITTER_TOKEN')
 auth = tweepy.OAuth2BearerHandler(bearer_token)
 api = tweepy.API(auth)
 
-tweets_file_path = 'tweets.json'
-data_file_path = 'data.json'
+tweets_file_path = 'public/tweets.json'
+data_file_path = 'public/data.json'
 
 
 ##### Scraping tweets #####
