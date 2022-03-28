@@ -2,7 +2,8 @@ name: 'Update Data'
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    # 6am - 12pm UTC hourly judging from tweets' created_at 02-26 - 03-28
+    - cron: '0 6-12 * * *'
   workflow_dispatch:
 
 jobs:
@@ -23,7 +24,7 @@ jobs:
           TWITTER_TOKEN: ${{ secrets.TWITTER_TOKEN }}
         run: |
           python updater.py
-      - name: Set current date as env variable
+      - name: Get current date
         id: date
         run: echo ::set-output name=today::$(date +'%Y-%m-%dT%H:%M:%SZ')
       - uses: stefanzweifel/git-auto-commit-action@v4
