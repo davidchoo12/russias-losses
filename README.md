@@ -1,4 +1,4 @@
-# Russia's Losses
+# [Russia's Losses](https://russiaslosses.netlify.app/)
 
 Visualization of Russia's military losses throughout the war against Ukraine.
 
