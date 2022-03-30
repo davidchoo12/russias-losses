@@ -38,9 +38,70 @@
       opacity: 20%;
       filter: blur(1em);
     }
+    header {
+      display: flex;
+      align-items: center;
+      padding: 0 2em;
+      flex-wrap: wrap;
+    }
     .title {
-      width: 100%;
-      text-align: center;
+      margin: none;
+      font-size: 1.5em;
+    }
+    .spanner {
+      flex-grow: 1;
+    }
+    .button-group {
+      display: flex;
+      column-gap: 1em;
+    }
+    .button-group > button, .button-group > select {
+      padding: 0 0.5em;
+      line-height: 2em;
+      white-space: nowrap;
+      cursor: pointer;
+      background: white;
+      opacity: 0.6;
+      transition: 0.3s;
+      border: 1px solid #0057b7;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .button-group > button:hover, .button-group > select:hover {
+      opacity: 1;
+    }
+    #charts:empty::before {
+      content: 'Loading charts...';
+    }
+    .uplot {
+      display: inline-block;
+      font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      padding: 1em 0;
+    }
+    #overlay {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 0.5rem;
+      margin: 0.75rem;
+      color: #fff;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .tooltip {
+      pointer-events: none;
+      position: absolute;
+      color: white;
+      background: rgba(0,0,0,0.9);
+      padding: 0.5em;
+      z-index: 1;
+      display: flex;
+      align-items: baseline;
+    }
+    .tooltip .x-value {
+      font-size: 0.9em;
+    }
+    #stats:empty::before {
+      content: 'Loading stats...';
     }
     .stat {
       display: inline-block;
@@ -66,34 +127,6 @@
     }
     .stat-unit {
       font-size: 1em;
-    }
-    .uplot {
-      display: inline-block;
-      font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      padding: 1em 0;
-    }
-    #overlay {
-      position: absolute;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 0.5rem;
-      margin: 0.75rem;
-      color: #fff;
-      z-index: 10;
-      pointer-events: none;
-    }
-    .tooltip {
-      pointer-events: none;
-      position: absolute;
-      color: white;
-      background: rgba(0,0,0,0.9);
-      padding: 0.5em;
-      /*width: 150px;*/
-      z-index: 1;
-      display: flex;
-      align-items: baseline;
-    }
-    .tooltip .x-value {
-      font-size: 0.9em;
     }
     /* adapted from tailwindcss */
     .container {
@@ -135,7 +168,18 @@
 </head>
 <body>
   <div class="bg"></div>
-  <h1 class="title">Russia's military losses in the Ukraine war</h1>
+  <header>
+    <h1 class="title">Russia's military losses in the Ukraine war</h1>
+    <div class="spanner"></div>
+    <div class="button-group">
+      <button id="charts-data-toggle">Show incremental charts</button>
+      <select id="charts-timerange-selector" autocomplete="off">
+        <option value="7d">Last 7 days</option>
+        <option value="30d">Last 30 days</option>
+        <option value="all" selected>All time</option>
+      </select>
+    </div>
+  </header>
   <div id="charts"></div>
   <div class="container">
     <h3>As of <span id="latest-date"></span>, Russia has lost:</h3>
@@ -147,10 +191,15 @@
     <h4>Notes:</h4>
     <ol>
       <li>All data is sourced from <a href="https://twitter.com/KyivIndependent/">@KyivIndependent Twitter</a> daily reports. Their source is from the General Staff of the Armed Forces of Ukraine. I chose not to source the data directly from the primary source is because the OCR does not work with their images.</li>
-      <li>Cars are renamed to Vehicles. Drones are renamed to UAV. Ships/patrol boats are renamed to Boats. BUK and Grad systems are summed as MLRS.</li>
+      <li>Troops are approximate values.</li>
+      <li>Cars are renamed to Vehicles. Drones are renamed to UAV. Ships/patrol boats are renamed to Boats. BUK and Grad systems are summed as MLRS. Earlier data used the former units but latest data uses the latter units.</li>
       <li>Boats is missing from the image on 2022-02-28.</li>
       <li>Special equipment was shown as only 2 from the image on 2022-03-26 (decreased from 18) but I corrected it to 19 according to the <a href="https://t.co/z6plV7HBNa">source from General Staff of the Armed Forces of Ukraine.</a></li>
+      <li>For a detailed view of the weapons losses, there is a team that tracks them based on online images and videos at <a href="https://www.oryxspioenkop.com/2022/02/attack-on-europe-documenting-equipment.html">Oryx</a>. Actual numbers are likely higher than their counts since they only track weapons with photo/video evidences.</li>
     </ol>
+    <h4>About this website</h4>
+    <p>This is just a pet project inspired by the leadership of President Zelenskyy and the absolute resilience (and balls of steel!) of the Ukrainian people. I hope this goes to show how terrible the Russian army is.</p>
+    <p>The code can be found in this <a href="https://github.com/davidchoo12/russias-losses/">repo</a>.</p>
   </div>
   <script>
     var $ = document.querySelector.bind(document)
@@ -184,7 +233,6 @@
 
         let ttc = u.cursortt = document.createElement("div")
         ttc.className = "tooltip"
-        // ttc.textContent = "(x,y)"
         over.appendChild(ttc)
 
         function hideTips() {
@@ -201,7 +249,7 @@
           }
         })
 
-        over.addEventListener("mouseenter", (e, a, b,c ,d) => {
+        over.addEventListener("mouseenter", () => {
           showTips()
         })
 
@@ -220,11 +268,9 @@
         cursorX = u.over.getBoundingClientRect().x + left
         cursorY = u.over.getBoundingClientRect().y + top
         if (cursorX + u.cursortt.offsetWidth > document.documentElement.clientWidth - 16) {
-        // if (left > u.over.getBoundingClientRect().width / 2) {
           left -= u.cursortt.offsetWidth
         }
         if (cursorY + u.cursortt.offsetHeight > document.documentElement.clientHeight - 16) {
-        // if (top > u.over.getBoundingClientRect().height / 2) {
           top -= u.cursortt.offsetHeight
         }
         u.cursortt.style.left = left + "px"
@@ -266,16 +312,12 @@
             fill: 'rgba(0, 87, 183,0.15)',
           }
         ],
-        scales: {
-          'x': {
-            range: [new Date('2022-02-25').getTime()/1000, xs[xs.length-1]+86400],
-          }
-        },
         legend: {
           show: false,
         },
         axes: [
           {
+            // src https://github.com/leeoniya/uPlot/tree/master/docs#axis--grid-opts
             // [0]:   minimum num secs in found axis split (tick incr)
             // [1]:   default tick format
             // [2-7]: rollover tick formats
@@ -317,17 +359,25 @@
       return new uPlot(opts, [xs, ys], $('#charts'))
     }
 
+    function pointsToXs(points) {
+      return points.map(([x,y]) => new Date(x).getTime()/1000)
+    }
+
+    function pointsToYsCumulative(points) {
+      return points.map(([x,y]) => y)
+    }
+
+    function pointsToYsIncremental(points) {
+      return points.map(([x,y],i,a) => i == 0 ? y : y - a[i-1][1])
+    }
+
     function makeCharts(stats) {
       let charts = {}
       for (const [name, points] of Object.entries(stats)) {
-        let xs = []
-        let ys = []
-        for (const [x, y] of points) {
-          let d = new Date(x)
-          xs.push(d.getTime()/1000)
-          ys.push(y)
-        }
+        let xs = pointsToXs(points)
+        let ys = pointsToYsCumulative(points)
         charts[name] = makeChart(name, xs, ys)
+        charts[name].setScale('x', {min: new Date('2022-02-26')/1000, max: xs[xs.length-1]})
       }
       return charts
     }
@@ -360,6 +410,38 @@
       }
     }
 
+    let isCumulative = true
+    function showChartsData(charts, stats) {
+      timerange = $('#charts-timerange-selector').value
+      nowEpochMs = new Date().getTime()
+      todayEpoch = new Date(nowEpochMs - nowEpochMs % 86400000).getTime() / 1000
+      timerangeToRangeMin = {
+        '7d': todayEpoch - 7 * 86400,
+        '30d': todayEpoch - 30 * 86400,
+        'all': new Date('2022-02-26').getTime() / 1000,
+      }
+      rangeMin = timerangeToRangeMin[timerange]
+      console.log(rangeMin, new Date(rangeMin*1000))
+      for (const [name, chart] of Object.entries(charts)) {
+        const points = stats[name]
+        let xs = pointsToXs(points)
+        let ys = isCumulative ? pointsToYsCumulative(points) : pointsToYsIncremental(points)
+        chart.setData([xs, ys])
+        chart.setScale('x', {min: rangeMin, max: xs[xs.length-1]})
+      }
+    }
+
+    function addHandlers(charts, stats) {
+      $('#charts-data-toggle').addEventListener('click', e => {
+        isCumulative = !isCumulative
+        showChartsData(charts, stats)
+        $('#charts-data-toggle').innerText = `Show ${isCumulative ? 'incremental' : 'cumulative'} charts`
+      })
+      $('#charts-timerange-selector').addEventListener('change', e => {
+        showChartsData(charts, stats)
+      })
+    }
+
     function render(data) {
       let stats = data.stats
       stats = capitalizeNames(stats)
@@ -367,6 +449,7 @@
       let charts = makeCharts(stats)
       showLatestStats(stats)
       showSourcesLinks(dateSource)
+      addHandlers(charts, stats)
     }
     fetch('data.json').then(r => r.json()).then(data => render(data))
   </script>
