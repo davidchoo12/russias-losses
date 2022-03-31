@@ -76,7 +76,10 @@
     .uplot {
       display: inline-block;
       font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      padding: 1em 0;
+      margin: 0.25em;
+      padding: 0.5em 0;
+      background: rgba(255,255,255,0.8);
+      border-radius: 4px;
     }
     #overlay {
       position: absolute;
@@ -221,7 +224,8 @@
         }
         i++
       }
-      const length = (window.innerWidth - 16) / (i+1) // 16 px for body horizontal margins
+      const columns = (i+1)
+      const length = (window.innerWidth - 16) / columns - 8 // 16px for body horizontal margins and 8px for in between margins
       return {
         width: length,
         height: length/2,
@@ -263,7 +267,7 @@
         const y = u.data[1][idx]
 
         if (x) {
-          u.cursortt.innerHTML = `<span class="x-value">${new Date(x*1000).toISOString().split('T')[0]}</span>&nbsp;&nbsp;${y}`
+          u.cursortt.innerHTML = `<span class="x-value">${new Date(x*1000).toISOString().split('T')[0]}</span>&nbsp;&nbsp;${y.toLocaleString()}`
         }
         cursorX = u.over.getBoundingClientRect().x + left
         cursorY = u.over.getBoundingClientRect().y + top
@@ -398,7 +402,7 @@
         if (points[points.length-1][0] != latestDate) {
           continue
         }
-        const number = points[points.length-1][1]
+        const number = points[points.length-1][1].toLocaleString()
         const delta = points.length == 1 ? points[0][1] : points[points.length-1][1] - points[points.length-2][1]
         addNewElem($('#stats'), `<div class="stat"><span class="stat-number">${number}</span><span class="delta${delta < 0 ? ' negative' : ''}">${delta}</span><span class="stat-unit">${name}</span></div>`)
       }
