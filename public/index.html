@@ -225,7 +225,8 @@
         i++
       }
       const columns = (i+1)
-      const length = (window.innerWidth - 16) / columns - 8 // 16px for body horizontal margins and 8px for in between margins
+      console.log(document.body.scrollWidth)
+      const length = document.body.scrollWidth / columns - 12 // 12px for in between margins and scrollbar width
       return {
         width: length,
         height: length/2,
