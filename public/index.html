@@ -75,11 +75,27 @@
     }
     .uplot {
       display: inline-block;
+      width: calc(100% - 0.5em);
       font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       margin: 0.25em;
       padding: 0.5em 0;
       background: rgba(255,255,255,0.8);
       border-radius: 4px;
+    }
+    @media (min-width: 640px) {
+      .uplot {
+        width: calc(50% - 0.5em);
+      }
+    }
+    @media (min-width: 1280px) {
+      .uplot {
+        width: calc(33.333% - 0.5em);
+      }
+    }
+    @media (min-width: 1536px) {
+      .uplot {
+        width: calc(25% - 0.5em);
+      }
     }
     #overlay {
       position: absolute;
@@ -225,8 +241,7 @@
         i++
       }
       const columns = (i+1)
-      console.log(document.body.scrollWidth)
-      const length = (document.body.scrollWidth - 15) / columns - 8 // 15px for scrollbar width, 8px for in between margins
+      const length = $('body').offsetWidth / columns - 8 // 8px for in between margins
       return {
         width: length,
         height: length/2,
