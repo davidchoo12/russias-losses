@@ -166,7 +166,7 @@ def sort_units(count_unit_list, units):
   count_unit_list.sort(key=lambda x: units.index(x[1]) if x[1] in units else 100)
 
 def clean_data(data):
-  unit_sequence = 'troops,planes,helicopters,tanks,artillery pieces,armored personnel carriers,MLRS,boats,vehicles,fuel tanks,UAV,anti-aircraft warfare,special equipment'.split(',')
+  unit_sequence = 'troops,planes,helicopters,tanks,artillery pieces,armored personnel carriers,MLRS,boats,vehicles,fuel tanks,UAV,anti-aircraft warfare,special equipment,mobile SRBM systems'.split(',')
   for date in data:
     fix_approximate_units(data[date], unit_sequence)
     if date == '2022-02-26':
