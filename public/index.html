@@ -20,7 +20,14 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/leeoniya/uPlot/dist/uPlot.min.css">
   <script src="https://cdn.jsdelivr.net/gh/leeoniya/uPlot/dist/uPlot.iife.min.js"></script>
-  <!-- <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet"> -->
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-B0F6BN0T4B"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-B0F6BN0T4B');
+  </script>
   <style>
     body {
       font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -471,7 +478,7 @@
       showSourcesLinks(dateSource)
       addHandlers(charts, stats)
     }
-    fetch('data.json').then(r => r.json()).then(data => render(data))
+    fetch('https://cdn.jsdelivr.net/gh/davidchoo12/russias-losses/public/data.json').then(r => r.json()).then(data => render(data))
   </script>
 </body>
 </html>
