@@ -16,6 +16,7 @@ jobs:
           python-version: '3.x'
       - name: Install dependencies
         run: |
+          sudo apt update
           sudo apt install -y tesseract-ocr libtesseract-dev
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
