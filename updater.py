@@ -176,6 +176,7 @@ def clean_data(data):
     rename_unit(data[date], 'cars', 'vehicles')
     rename_unit(data[date], 'drones', 'UAV')
     rename_unit(data[date], 'ships/patrol boats', 'boats')
+    rename_unit(data[date], 'Hees', 'troops') # 2022-04-15 "troops" detected as "Hees"
     merge_units(data[date], 'MLRS', lambda buk, grad: buk+grad, 'BUK system', 'Grad systems')
     sort_units(data[date], unit_sequence)
 
