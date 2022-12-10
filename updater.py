@@ -65,15 +65,16 @@ def get_tweets_date_url(tweets):
 ##### OCR on tweets' images #####
 
 # src https://stackoverflow.com/a/55026951/4858751
-def url_to_image(url, readFlag=cv2.IMREAD_COLOR):
+def url_to_image(url, readFlag=cv2.IMREAD_GRAYSCALE):
   resp = urlopen(url)
   arr = np.asarray(bytearray(resp.read()), dtype="uint8")
   image = cv2.imdecode(arr, readFlag)
+  image = cv2.threshold(image, 10, 255, cv2.THRESH_BINARY)[1]
   return image
 
 # perc params range 0 - 1
 def crop_img(img, upper_x_perc, upper_y_perc, lower_x_perc, lower_y_perc):
-  height, width, _ = img.shape
+  height, width = img.shape
   upper_x = round(width * upper_x_perc)
   upper_y = round(height * upper_y_perc)
   lower_x = round(width * lower_x_perc)
@@ -86,6 +87,8 @@ def tweet_to_images(tweet):
   crop_coords = [[0.14, 0.22, 0.5, 0.9], [0.6, 0.22, 1, 1]]
   if tweet.created_at.date() > date(2022, 5, 1):
     crop_coords = [[0.13, 0.22, 0.5, 0.9], [0.58, 0.22, 1, 1]]
+  if tweet.created_at.date() > date(2022, 11, 11):
+    crop_coords = [[0.15, 0.21, 0.5, 0.95], [0.62, 0.22, 1, 1]]
   cropped_imgs = []
   for crop_coord in crop_coords:
     cropped = crop_img(img, crop_coord[0], crop_coord[1], crop_coord[2], crop_coord[3])
@@ -171,7 +174,7 @@ def merge_units(count_unit_list, to_unit, merger_lambda, *from_units):
   count_unit_list.append((count, to_unit))
 
 def clean_data(data):
-  known_units = 'troops,planes,helicopters,tanks,artillery pieces,armored personnel carriers,MLRS,boats,vehicles,fuel tanks,UAV,anti-aircraft warfare,special equipment,mobile SRBM systems,APV,boats / cutters,vehicles and fuel tanks,cruise missiles'.split(',')
+  known_units = 'troops,planes,helicopters,tanks,artillery system,armored personnel carriers,MLRS,boats,vehicles,fuel tanks,UAV,anti-aircraft warfare,special equipment,mobile SRBM systems,APV,boats / cutters,vehicles and fuel tanks,cruise missiles'.split(',')
   for date in data:
     fix_approximate_units(data[date], known_units)
     if date == '2022-02-26':
@@ -190,6 +193,11 @@ def clean_data(data):
     merge_units(data[date], 'vehicles and fuel tanks', lambda vehicles, fuel_tanks: vehicles+fuel_tanks, 'vehicles', 'fuel tanks')
     if date == '2022-05-01':
       override_unit_count(data[date], 'vehicles and fuel tanks', 1796) # src https://t.co/yX3LtMGXtA
+    # unit change 11-11 ("artillery units" and "artillery pieces" were used previously)
+    rename_unit(data[date], 'artillery units', 'artillery system')
+    rename_unit(data[date], 'artillery pieces', 'artillery system')
+    if date == '2022-11-11':
+      data[date] = [(79400,'troops'),(5696,'APV'),(4259,'vehicles and fuel tanks'),(2814,'tanks'),(1817,'artillery system'),(1505,'UAV'),(393,'MLRS'),(278,'planes'),(261,'helicopters'),(399,'cruise missiles'),(205,'anti-aircraft warfare'),(159,'special equipment'),(16,'boats / cutters')] # src https://t.co/NnrzUkZVBD
 
 def sort_units(data_per_unit, units):
   sorted_data_per_unit = {}
