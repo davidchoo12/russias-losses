@@ -1,5 +1,7 @@
+from pathlib import Path
+import logging
+import requests
 import json
-import tweepy
 # src https://towardsdatascience.com/read-text-from-image-with-one-line-of-python-code-c22ede074cac
 import cv2
 from datetime import date
@@ -7,62 +9,21 @@ import pytesseract
 import numpy as np
 from urllib.request import urlopen
 import re
-from concurrent.futures import ProcessPoolExecutor
 import os
 import difflib
 
-bearer_token = os.environ.get('TWITTER_TOKEN')
-auth = tweepy.OAuth2BearerHandler(bearer_token)
-api = tweepy.API(auth)
-
-tweets_file_path = 'public/tweets.json'
 data_file_path = 'public/data.json'
 
+Path('logs').mkdir(exist_ok=True)
+log_format = '%(relativeCreated)8d %(message)s'
+logging.basicConfig(level=logging.DEBUG, format=log_format)
+file_handler = logging.FileHandler('logs/updater-facebook.txt', 'w')
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(logging.Formatter(log_format))
+logger = logging.getLogger()
+logger.addHandler(file_handler)
 
-##### Scraping tweets #####
-
-def load_saved_tweets():
-  if not os.path.isfile(tweets_file_path):
-    return []
-  with open(tweets_file_path, 'r') as f:
-    saved_tweets = json.load(f)
-  saved_tweets = [tweepy.models.Status.parse(api, t) for t in saved_tweets]
-  return saved_tweets
-
-def print_tweets(tweets):
-  for tweet in tweets:
-    start_index, end_index = tweet.display_text_range
-    text = tweet.full_text[start_index:end_index]
-    url = tweet.full_text[end_index+1:]
-    print(tweet.id, url, tweet.entities['media'][0]['media_url_https'], text)
-
-def get_new_tweets(saved_tweets):
-  new_tweets = []
-  for tweet in tweepy.Cursor(api.user_timeline, screen_name='KyivIndependent', tweet_mode='extended').items(2000):
-    # if found last saved tweet, break
-    if len(saved_tweets) > 0 and tweet.id == saved_tweets[-1].id:
-      break
-    if 'media' in tweet.entities and 'losses' in tweet.full_text:
-      new_tweets.append(tweet)
-  return new_tweets
-
-def save_tweets(tweets):
-  with open(tweets_file_path, 'w') as f:
-    json.dump([t._json for t in tweets], f, separators=(',', ':'))
-  return
-
-def get_tweets_date_url(tweets):
-  date_url = {}
-  for tweet in tweets:
-    date = tweet.created_at.date().isoformat()
-    start_index, end_index = tweet.display_text_range
-    text = tweet.full_text[start_index:end_index]
-    url = tweet.full_text[end_index+1:]
-    date_url[date] = url
-  return date_url
-
-
-##### OCR on tweets' images #####
+##### OCR on facebook images posts #####
 
 # src https://stackoverflow.com/a/55026951/4858751
 def url_to_image(url, readFlag=cv2.IMREAD_GRAYSCALE):
@@ -81,14 +42,9 @@ def crop_img(img, upper_x_perc, upper_y_perc, lower_x_perc, lower_y_perc):
   lower_y = round(height * lower_y_perc)
   return img[upper_y:lower_y, upper_x:lower_x]
 
-def tweet_to_images(tweet):
-  img_url = tweet.entities['media'][0]['media_url_https']
-  img = url_to_image(img_url)
-  crop_coords = [[0.14, 0.22, 0.5, 0.9], [0.6, 0.22, 1, 1]]
-  if tweet.created_at.date() > date(2022, 5, 1):
-    crop_coords = [[0.13, 0.22, 0.5, 0.9], [0.58, 0.22, 1, 1]]
-  if tweet.created_at.date() > date(2022, 11, 11):
-    crop_coords = [[0.15, 0.21, 0.5, 0.95], [0.62, 0.22, 1, 1]]
+def url_to_images(url):
+  img = url_to_image(url)
+  crop_coords = [[0.15, 0.21, 0.5, 0.95], [0.62, 0.22, 1, 1]]
   cropped_imgs = []
   for crop_coord in crop_coords:
     cropped = crop_img(img, crop_coord[0], crop_coord[1], crop_coord[2], crop_coord[3])
@@ -97,10 +53,10 @@ def tweet_to_images(tweet):
 
 def text_to_stats(text):
   result = []
-  rgx = re.compile(r'(\d[\d,]*)[^0-9a-zA-Z]+(\D+?(?:\n[a-zA-Z ]+)*)\n')
+  rgx = re.compile(r'(\d[\d,.]*)[^0-9a-zA-Z]+(\D+?(?:\n[a-zA-Z ]+)*)\n')
   for match in rgx.finditer(text):
     count, unit = match.groups()
-    count = int(count.replace(',', ''))
+    count = int(count.replace(',', '').replace('.', ''))
     unit = unit.replace('\n', ' ')
     result.append((count, unit))
   return result
@@ -109,26 +65,44 @@ def image_to_stats(img):
   # src https://pyimagesearch.com/2021/11/15/tesseract-page-segmentation-modes-psms-explained-how-to-improve-your-ocr-accuracy/
   # psm 4: Assume a single column of text of variable sizes.
   text = pytesseract.image_to_string(img, lang='eng', config='--psm 4')
+  logger.info(text)
   return text_to_stats(text)
 
-def tweet_to_stats(tweet):
-  imgs = tweet_to_images(tweet)
+def url_to_stats(url):
+  imgs = url_to_images(url)
   count_unit_list = []
   for img in imgs:
     count_unit_list += image_to_stats(img)
   return count_unit_list
 
-def tweets_to_data(tweets):
+def pid_to_stats(pid):
+  res = ses.get(base_url + f'/photo.php?fbid={pid}')
+  save_res(res, f'russias-losses-updater-last-response.html')
+  if not res.ok:
+    return
+  created_time_image_url_match = created_time_image_url_re.search(res.text)
+  created_time = created_time_image_url_match.group(1)
+  created_date = date.fromtimestamp(int(created_time)).isoformat()
+  image_url = created_time_image_url_match.group(2)
+  image_url = image_url.replace('\\', '')
+  count_unit_list = url_to_stats(image_url)
+  return (created_date, count_unit_list)
+
+def pids_to_data(pids):
   data = {}
-  with ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
-    for tweet, count_unit_list in zip(tweets, executor.map(tweet_to_stats, tweets)):
-      count_unit_list = tweet_to_stats(tweet)
-      data[tweet.created_at.date().isoformat()] = count_unit_list
-  return data
+  date_url = {}
+  for pid in pids:
+    created_date, count_unit_list = pid_to_stats(pid)
+    if created_date in date_url:
+      logger.error('unexpected multiple posts on same date found in new posts, %s and https://fb.com/%s', date_url[created_date], pid)
+      exit(1)
+    data[created_date] = count_unit_list
+    date_url[created_date] = f'https://fb.com/{pid}'
+  return (data, date_url)
 
 def print_data(data):
   for date, count_unit_list in data.items():
-    print(date, ', '.join(' '.join(str(w) for w in t) for t in count_unit_list))
+    logger.info('%s %s', date, ', '.join(' '.join(str(w) for w in t) for t in count_unit_list))
 
 
 ##### Data cleanup #####
@@ -199,6 +173,9 @@ def clean_data(data):
     if date == '2022-11-11':
       data[date] = [(79400,'troops'),(5696,'APV'),(4259,'vehicles and fuel tanks'),(2814,'tanks'),(1817,'artillery system'),(1505,'UAV'),(393,'MLRS'),(278,'planes'),(261,'helicopters'),(399,'cruise missiles'),(205,'anti-aircraft warfare'),(159,'special equipment'),(16,'boats / cutters')] # src https://t.co/NnrzUkZVBD
 
+
+##### Data wrangling #####
+
 def sort_units(data_per_unit, units):
   sorted_data_per_unit = {}
   for unit in units:
@@ -224,6 +201,14 @@ def process_data(data, saved_data_per_unit={}):
   data_per_unit = transpose_data(data, saved_data_per_unit)
   return data_per_unit
 
+def merge_date_source(saved_date_source, new_date_source):
+  for date, source in new_date_source.items():
+    if date in saved_date_source:
+      logger.error('unexpected new post %s on same date %s as existing post %s', source, date, saved_date_source[date])
+      exit(1)
+    saved_date_source[date] = source
+  return saved_date_source
+
 def save_processed_data(data, tweets_date_url):
   to_save = {
     'stats': data,
@@ -232,32 +217,92 @@ def save_processed_data(data, tweets_date_url):
   with open(data_file_path, 'w') as f:
     json.dump(to_save, f, separators=(',', ':'))
 
-def load_processed_data():
+def load_data_json():
   if not os.path.isfile(data_file_path):
     return {}
   with open(data_file_path, 'r') as f:
     data = json.load(f)
-  return data.get('stats', {})
+  return data
+
+def get_latest_pid(saved_date_source):
+  latest_date = max(saved_date_source.keys())
+  latest_source = saved_date_source[latest_date]
+  return latest_source.split('/')[-1]
+
+def save_res(res, name):
+  res_dest = f'/tmp/{name}'
+  logger.error('saving response to ' + res_dest)
+  with open(res_dest, 'w') as fd:
+    fd.write(res.text)
+
+
+##### Data scraping #####
+
+ses = requests.Session()
+base_url = 'https://www.facebook.com'
+default_headers = {
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.5',
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/109.0',
+  'Sec-Fetch-Site': 'none',
+}
+ses.headers.update(default_headers)
+
+cursor_re = re.compile(r'"end_cursor":"([^"]+)","has_next_page":true')
+post_ids_re = re.compile(r'"id":"([^"]+)","accessibility_caption":"(?:\\"|[^"])*Russia\'s losses')
+created_time_image_url_re = re.compile(r'"created_time":(\d+),"image":{"uri":"([^"]+)"')
+
+def scrape_new_pids(latest_pid):
+  res = ses.get(base_url + '/kyivindependent/photos')
+  save_res(res, f'russias-losses-updater-last-response.html')
+  if not res.ok:
+    return
+
+  cursor = cursor_re.search(res.text).group(1)
+  post_ids_matches = post_ids_re.findall(res.text)
+  scraped_pids = curr_pids = list(dict.fromkeys(post_ids_matches))
+  while latest_pid not in curr_pids:
+    formdata = {
+      'variables': json.dumps({
+        'count': 8,
+        'cursor': cursor,
+        'id': 'YXBwX2NvbGxlY3Rpb246MTAwMDc1NzgyMzU2Mzk4OjIzMDUyNzI3MzI6NQ=='
+      }, separators=(',', ':')),
+      'doc_id': '6133315026790556',
+    }
+    res = ses.post(base_url + '/api/graphql', data=formdata)
+    save_res(res, f'russias-losses-updater-last-response.html')
+    if not res.ok:
+      return
+    curr_pids = list(dict.fromkeys(post_ids_re.findall(res.text)))
+    cursor = cursor_re.search(res.text).group(1)
+    scraped_pids.extend(curr_pids)
+  for i, pid in enumerate(scraped_pids):
+    if pid == latest_pid:
+      scraped_pids = scraped_pids[:i]
+      break
+  scraped_pids.reverse()
+  return scraped_pids
 
 
 if __name__ == '__main__':
-  saved_tweets = load_saved_tweets()
-  new_tweets = get_new_tweets(saved_tweets)[::-1]
-  print('New tweets:')
-  print_tweets(new_tweets)
+  saved_data = load_data_json()
+  saved_date_source = saved_data['date_source']
+  latest_pid = get_latest_pid(saved_date_source)
 
-  all_tweets = saved_tweets + new_tweets
-  # all_tweets = all_tweets[:-3]
-  save_tweets(all_tweets)
-  all_tweets_date_url = get_tweets_date_url(all_tweets)
-
-  new_data = tweets_to_data(new_tweets)
-  print('New data:')
+  new_pids = scrape_new_pids(latest_pid)
+  new_data, new_date_source = pids_to_data(new_pids)
+  if len(new_data) == 0:
+    logger.info('No new data')
+    exit(0)
+  logger.info('New data:')
   print_data(new_data)
 
-  saved_processed_data = load_processed_data()
+  saved_processed_data = saved_data['stats']
   all_processed_data = process_data(new_data, saved_data_per_unit=saved_processed_data)
-  print('All processed data:')
-  print_data(all_processed_data)
+  # logger.info('All processed data:')
+  # print_data(all_processed_data)
 
-  save_processed_data(all_processed_data, all_tweets_date_url)
+  all_date_source = merge_date_source(saved_date_source, new_date_source)
+
+  save_processed_data(all_processed_data, all_date_source)
