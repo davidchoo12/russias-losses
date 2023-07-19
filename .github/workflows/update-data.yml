@@ -2,24 +2,23 @@ name: 'Update Data'
 
 on:
   schedule:
-    # 6am - 12pm UTC hourly judging from tweets' created_at 02-26 - 03-28
-    - cron: '0 6-12 * * *'
+    - cron: '0 10 * * *'
   workflow_dispatch:
 
 jobs:
   update_data:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v3
-        with:
-          python-version: '3.x'
-      - name: Install dependencies
+      - name: Install tesseract
         run: |
           sudo apt update
           sudo apt install -y tesseract-ocr libtesseract-dev
-          python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
       - name: Update data to latest
         env:
           TWITTER_TOKEN: ${{ secrets.TWITTER_TOKEN }}
